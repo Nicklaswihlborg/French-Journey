@@ -134,8 +134,9 @@
       if(!btn._wired){ btn.onclick=()=>addXP(parseInt(btn.dataset.xp,10), fl); btn._wired=true; }
     });
 
-    $('#streakBadge') && ($('#streakBadge').textContent=`🔥 Streak: ${calcStreak(goal)}`);
-    $('#streakDays') && ($('#streakDays').textContent=calcStreak(goal));
+    const streak = calcStreak(goal);
+    $('#streakBadge') && ($('#streakBadge').textContent=`🔥 Streak: ${streak}`);
+    $('#streakDays') && ($('#streakDays').textContent=streak);
     $('#wkXp') && ($('#wkXp').textContent=calcThisWeekXP());
 
     $('#dailyMinutes') && ($('#dailyMinutes').value = store.get(K.dailyMinutes,40));
@@ -246,4 +247,187 @@
     Object.keys(PROMPTS).forEach(cat=>{ const o=document.createElement('option'); o.value=cat; o.textContent=cat[0].toUpperCase()+cat.slice(1); sel.appendChild(o); });
   }
   function randomPrompt(cat){ const arr=PROMPTS[cat]||PROMPTS[Object.keys(PROMPTS)[0]]||[]; return arr[Math.floor(Math.random()*arr.length)]||''; }
-  function setPrompt(cat){ $('#promptBox') && ($('#promptBox').value = randomPrompt(cat));
+  function setPrompt(cat){ $('#promptBox') && ($('#promptBox').value = randomPrompt(cat)); }
+  $('#newPrompt')   && ($('#newPrompt').onclick   = ()=> setPrompt($('#promptSelect')?.value || Object.keys(PROMPTS)[0]));
+  $('#promptSelect')&& ($('#promptSelect').onchange= ()=> setPrompt($('#promptSelect').value));
+  $('#speakPrompt') && ($('#speakPrompt').onclick = ()=>{ const t=$('#promptBox')?.value||''; speak(t,'fr-FR',1); });
+
+  const micState=$('#micState'), recState=$('#recState'), out=$('#speechOut');
+  $('#askMic') && ($('#askMic').onclick = async ()=>{
+    try{ const s=await navigator.mediaDevices.getUserMedia({audio:true}); s.getTracks().forEach(t=>t.stop()); if(micState) micState.innerHTML='🎙️ Micro: <span class="mono">granted</span>'; }
+    catch{ if(micState) micState.innerHTML='🎙️ Micro: <span class="mono">blocked</span>'; alert("Autorisez le micro pour github.io"); }
+  });
+  (async function initMicStatus(){
+    if(!micState) return;
+    if(!navigator.mediaDevices?.getUserMedia){ micState.innerHTML='🎙️ Micro: <span class="mono">unsupported</span>'; return; }
+    try{
+      const r = await navigator.permissions?.query({name:'microphone'});
+      if(r){ micState.innerHTML = '🎙️ Micro: <span class="mono">'+r.state+'</span>'; r.onchange=()=> micState.innerHTML='🎙️ Micro: <span class="mono">'+r.state+'</span>'; }
+      else micState.innerHTML='🎙️ Micro: <span class="mono">unknown</span>';
+    }catch{ micState.innerHTML='🎙️ Micro: <span class="mono">unknown</span>'; }
+  })();
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recog=null;
+  function startRec(){
+    if(!SR){ alert("La reconnaissance vocale n'est pas disponible ici. Essayez Chrome."); return; }
+    if(recog) return;
+    try{
+      recog=new SR(); recog.lang='fr-FR'; recog.interimResults=true; recog.continuous=true; if(out) out.value='';
+      recog.onresult=(e)=>{ let txt=''; for(let i=0;i<e.results.length;i++){ txt += e.results[i][0].transcript + (e.results[i].isFinal?'\n':' '); } if(out) out.value=txt.trim(); };
+      recog.onerror =(e)=> console.warn('SR error:', e);
+      recog.onend   =()=>{ if(recState) recState.innerHTML='🗣️ État: <span class="mono">inactif</span>'; const stopBtn=$('#stopRec'); if(stopBtn) stopBtn.disabled=true; recog=null; };
+      recog.start(); if(recState) recState.innerHTML='🗣️ État: <span class="mono">écoute…</span>'; const stopBtn=$('#stopRec'); if(stopBtn) stopBtn.disabled=false;
+    }catch(e){ alert("Impossible de démarrer. Autorisez le micro, puis réessayez."); console.warn(e); }
+  }
+  function stopRec(){ try{ recog && recog.stop(); }catch{} }
+  $('#startRec') && ($('#startRec').onclick = startRec);
+  $('#stopRec')  && ($('#stopRec').onclick  = stopRec);
+  $('#markSpeakXP') && ($('#markSpeakXP').onclick = ()=> addXP(5,'speaking'));
+
+  /* ---------- Listening ---------- */
+  let lastUtter=null, dIdx=0;
+  function playCurrentDictation(){
+    if(!DICT.length){ const h=$('#dictationHint'); if(h) h.textContent='(Aucune dictée)'; return; }
+    const d=DICT[dIdx%DICT.length];
+    const hint=$('#dictationHint'); if(hint) hint.textContent="Indice : "+d.hint;
+    const tgt=$('#dictationTarget'); if(tgt) tgt.textContent=d.text;
+    // speak guarded
+    try{
+      if('speechSynthesis' in window){
+        speechSynthesis.cancel();
+        const u=new SpeechSynthesisUtterance(d.text); u.lang='fr-FR'; u.rate=0.95; lastUtter=u; speechSynthesis.speak(u);
+      } else { alert("Synthèse vocale non disponible."); }
+    }catch{ alert("Synthèse vocale indisponible."); }
+  }
+  $('#playDictation')   && ($('#playDictation').onclick   = ()=> playCurrentDictation());
+  $('#replayDictation') && ($('#replayDictation').onclick = ()=>{ try{ if(lastUtter && 'speechSynthesis' in window) speechSynthesis.speak(lastUtter); else playCurrentDictation(); }catch{} });
+  $('#checkDictation')  && ($('#checkDictation').onclick  = ()=>{
+    const target = ($('#dictationTarget')?.textContent||'').trim().toLowerCase();
+    const guess  = ($('#dictationInput')?.value||'').trim().toLowerCase();
+    const wa=target.replace(/[^\p{L}\p{N}\s']/gu,'').split(/\s+/);
+    const wb=guess .replace(/[^\p{L}\p{N}\s']/gu,'').split(/\s+/);
+    const set=new Set(wa); let match=0; wb.forEach(w=>{ if(set.has(w)) match++; });
+    const score = wa.length? match/wa.length : 0;
+    const sc=$('#dictationScore'); if(sc) sc.textContent=`Score: ${Math.round(score*100)}%`;
+  });
+  $('#markListenXP') && ($('#markListenXP').onclick = ()=> addXP(5,'listening'));
+
+  /* ---------- Vocab SRS ---------- */
+  let vocab = store.get(K.vocabList,[]);
+  function refreshVocabTable(){
+    const tb=$('#vTable tbody'); if(!tb) return; tb.innerHTML='';
+    vocab.forEach(w=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${esc(w.fr)}</td><td>${esc(w.en)}</td><td class="small">${w.due}</td><td><button class="btn bad small" data-del="${w.id}">Sup.</button></td>`; tb.appendChild(tr); });
+    tb.onclick = (e)=>{ const id=e.target.getAttribute('data-del'); if(id){ vocab=vocab.filter(x=>x.id!=id); store.set(K.vocabList,vocab); refreshVocabTable(); updateDueCount(); } };
+  }
+  function updateDueCount(){
+    const today=fmt(todayKey());
+    const due=vocab.filter(v=> v.due<=today).length;
+    const a=$('#dueCount'); if(a) a.textContent=due;
+    const b=$('#dueNow');  if(b) b.textContent=due;
+  }
+  function addVocab(fr,en){
+    const id=Date.now()+Math.random();
+    vocab.push({id, fr, en, ease:2.5, interval:0, reps:0, due:fmt(todayKey())});
+    store.set(K.vocabList,vocab);
+    refreshVocabTable(); updateDueCount();
+  }
+  $('#addWord') && ($('#addWord').onclick = ()=>{
+    const fr=$('#vFr')?.value.trim(), en=$('#vEn')?.value.trim();
+    if(!fr||!en) return;
+    addVocab(fr,en); if($('#vFr')) $('#vFr').value=''; if($('#vEn')) $('#vEn').value='';
+  });
+  $('#exportVocab') && ($('#exportVocab').onclick = ()=>{
+    try{
+      const blob=new Blob([JSON.stringify(vocab,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='vocab.json'; a.click(); URL.revokeObjectURL(url);
+    }catch{ alert('Export indisponible.'); }
+  });
+  $('#importVocab') && ($('#importVocab').onchange = (e)=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{ try{ const arr=JSON.parse(r.result); if(Array.isArray(arr)){ vocab=arr; store.set(K.vocabList,vocab); refreshVocabTable(); updateDueCount(); } }catch{ alert('Fichier invalide'); } };
+    r.readAsText(f);
+  });
+  $('#clearVocab') && ($('#clearVocab').onclick = ()=>{ if(confirm('Effacer tout le vocabulaire ?')){ vocab=[]; store.set(K.vocabList,vocab); refreshVocabTable(); updateDueCount(); } });
+
+  // Quiz (SM-2 lite)
+  let quizQueue=[], currentCard=null;
+  function disableRate(dis){ ['rateAgain','rateHard','rateGood','rateEasy'].forEach(id=>{ const el=$('#'+id); if(el) el.disabled=dis; }); }
+  function serveNextCard(){
+    currentCard = quizQueue.shift();
+    if(!currentCard){
+      const h=$('#quizFront h2'); if(h) h.textContent='Terminé 👏';
+      disableRate(true); const b=$('#markVocabXP'); if(b) b.disabled=false; return;
+    }
+    const h=$('#quizFront h2'); if(h) h.textContent=currentCard.fr;
+    const ans=$('#quizAnswer'); if(ans) ans.value='';
+    const back=$('#quizBack'); if(back) back.textContent='';
+    disableRate(true); const rev=$('#revealA'); if(rev) rev.disabled=false;
+    const sk=$('#skipCard'); if(sk) sk.disabled=false;
+  }
+  function rateCard(grade){
+    const c=currentCard; if(!c) return;
+    if(grade<3){ c.reps=0; c.interval=1; c.ease=Math.max(1.3,c.ease-0.2);}
+    else { c.reps+=1; if(c.reps===1) c.interval=1; else if(c.reps===2) c.interval=3; else c.interval=Math.round(c.interval*c.ease); c.ease=Math.min(3.0, c.ease+(grade===4?0.15:0)); }
+    c.due = fmt(addDays(new Date(), c.interval));
+    const idx=vocab.findIndex(v=>v.id===c.id); if(idx>-1) vocab[idx]=c; store.set(K.vocabList,vocab);
+    refreshVocabTable(); updateDueCount(); serveNextCard();
+  }
+  $('#startQuiz') && ($('#startQuiz').onclick = ()=>{
+    const today=fmt(todayKey());
+    quizQueue = vocab.filter(v=> v.due<=today);
+    if(!quizQueue.length){ alert("Aucune carte due. Ajoutez des mots ou attendez le prochain rappel."); return; }
+    serveNextCard();
+  });
+  $('#skipCard') && ($('#skipCard').onclick = ()=> serveNextCard());
+  $('#revealA') && ($('#revealA').onclick = ()=>{
+    if(!currentCard) return;
+    const back=$('#quizBack'); if(back) back.textContent=currentCard.en;
+    disableRate(false); const rev=$('#revealA'); if(rev) rev.disabled=true;
+  });
+  $('#rateAgain')&&($('#rateAgain').onclick = ()=> rateCard(0));
+  $('#rateHard') &&($('#rateHard').onclick  = ()=> rateCard(2));
+  $('#rateGood') &&($('#rateGood').onclick  = ()=> rateCard(3));
+  $('#rateEasy') &&($('#rateEasy').onclick  = ()=> rateCard(4));
+  $('#markVocabXP') && ($('#markVocabXP').onclick = ()=>{ addXP(5,'vocab'); const b=$('#markVocabXP'); if(b) b.disabled=true; });
+
+  /* ---------- Phrases ---------- */
+  function todaysPhraseIndexes(){
+    const seed = parseInt((store.get(K.dueSeed) ?? Date.now()).toString().slice(-6),10);
+    const day  = parseInt(todayKey().replace(/-/g,''),10);
+    const rand = (n)=> (Math.abs(Math.sin(seed+day+n))*10000)%PHRASES.length|0;
+    const set=new Set(); while(set.size<10 && set.size<PHRASES.length) set.add(rand(set.size));
+    return [...set];
+  }
+  function renderPhrases(){
+    const c=$('#phraseList'); if(!c) return; c.innerHTML='';
+    const list = PHRASES.length ? todaysPhraseIndexes().map(i=>PHRASES[i]) : [];
+    list.forEach((p,i)=>{
+      const row=document.createElement('div'); row.className='row'; row.style.marginBottom='6px';
+      const btn=document.createElement('button'); btn.className='btn'; btn.textContent='🔊';
+      btn.onclick=()=> speak(p,'fr-FR',1);
+      const span=document.createElement('span'); span.textContent=(i+1)+'. '+p;
+      row.appendChild(btn); row.appendChild(span); c.appendChild(row);
+    });
+  }
+  $('#speakAllPhrases') && ($('#speakAllPhrases').onclick = ()=>{ PHRASES.forEach((p,i)=> setTimeout(()=>speak(p,'fr-FR',1), i*1500)); });
+  $('#newPhrases')       && ($('#newPhrases').onclick = ()=>{ store.set(K.dueSeed, Date.now()); renderPhrases(); });
+  $('#markPhrasesXP')    && ($('#markPhrasesXP').onclick = ()=> addXP(5,'phrases'));
+
+  /* ---------- init ---------- */
+  async function init(){
+    initTabs();
+    await loadData();
+    showSaveStatus();
+
+    // sections
+    renderArticle(); fillPromptSelect(); setPrompt(Object.keys(PROMPTS)[0]||'daily');
+    refreshVocabTable(); updateDueCount(); renderPhrases();
+
+    // dashboard
+    refreshProgress(); draw14(); setB2Countdown();
+    window.addEventListener('resize', draw14);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
