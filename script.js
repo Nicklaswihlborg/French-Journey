@@ -471,11 +471,6 @@ $('#markPhrasesXP').onclick = ()=> addXP(5,'phrases');
 /* ===========================
    INIT
    =========================== */
-function setB2Countdown(){ // already defined above; redefine safe
-  const now=new Date(); const end=new Date(now.getFullYear(),11,31);
-  const days=Math.max(0, Math.ceil((end - now)/86400000));
-  $('#daysToB2').textContent = days;
-}
 async function init(){
   initTabs();
   await loadAllData();
