@@ -1,0 +1,27 @@
+{
+  "daily": [
+    "Décris ta routine du matin en cinq étapes.",
+    "Quelles habitudes saines veux-tu mettre en place ce mois-ci ?",
+    "Qu’as-tu fait hier soir après le travail ?"
+  ],
+  "opinion": [
+    "Es-tu d’accord avec l’idée de travailler à distance ? Pourquoi/pourquoi pas ?",
+    "Les réseaux sociaux sont-ils utiles ou dangereux ? Donne deux raisons.",
+    "Faut-il limiter les voitures en centre-ville ?"
+  ],
+  "past": [
+    "Raconte un souvenir d’enfance marquant.",
+    "Parle d’un voyage récent: où, avec qui, et pourquoi c’était bien.",
+    "Décris une difficulté que tu as surmontée."
+  ],
+  "future": [
+    "Quels sont tes objectifs d’ici six mois ? Comment vas-tu t’y prendre ?",
+    "Où te vois-tu dans trois ans, professionnellement ?",
+    "Explique un projet que tu voudrais réaliser le week-end prochain."
+  ],
+  "work": [
+    "Explique ton rôle actuel et un projet sur lequel tu travailles.",
+    "Décris un problème au travail et ta solution.",
+    "Comment organises-tu tes priorités dans la semaine ?"
+  ]
+}
