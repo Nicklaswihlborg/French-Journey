@@ -1,0 +1,47 @@
+[
+  {
+    "title": "Le vélo en ville",
+    "fr": "Aujourd’hui, la mairie a ouvert une nouvelle piste cyclable au centre-ville pour réduire la circulation et la pollution. Les habitants disent que la piste est large et sûre. Les commerçants espèrent voir plus de clients, car il sera plus facile d’accéder aux magasins à vélo.",
+    "en": "Today, the city hall opened a new bike lane downtown to reduce traffic and pollution. Residents say the lane is wide and safe. Shop owners hope to see more customers because it will be easier to reach stores by bike.",
+    "qs": [
+      "Pourquoi la mairie a-t-elle ouvert une nouvelle piste cyclable ?",
+      "Que pensent les habitants de la piste ?",
+      "Qu’espèrent les commerçants ?"
+    ],
+    "ans": [
+      "Pour réduire la circulation et la pollution.",
+      "Elle est large et sûre.",
+      "Avoir plus de clients grâce à l’accès plus facile aux magasins."
+    ]
+  },
+  {
+    "title": "La météo et l’agriculture",
+    "fr": "Après plusieurs semaines de pluie, les agriculteurs profitent enfin du soleil pour récolter. Les experts disent que la qualité sera correcte, mais certains fruits sont plus petits que d’habitude. Les marchés locaux restent bien approvisionnés.",
+    "en": "After several weeks of rain, farmers are finally enjoying the sun to harvest. Experts say quality will be fine, but some fruits are smaller than usual. Local markets remain well supplied.",
+    "qs": [
+      "Quel temps faisait-il ces dernières semaines ?",
+      "Quel est l’impact sur les fruits ?",
+      "Comment vont les marchés locaux ?"
+    ],
+    "ans": [
+      "Il a plu pendant plusieurs semaines.",
+      "Certains fruits sont plus petits que d’habitude.",
+      "Ils restent bien approvisionnés."
+    ]
+  },
+  {
+    "title": "Le train du matin",
+    "fr": "La compagnie ferroviaire a ajouté deux trains le matin pour éviter la foule aux heures de pointe. Les voyageurs remarquent des trajets plus calmes et plus rapides. L’entreprise surveille la fréquentation avant de décider de nouvelles lignes.",
+    "en": "The railway company added two morning trains to avoid crowds at rush hour. Travelers are noticing calmer, faster rides. The company is monitoring ridership before deciding on new routes.",
+    "qs": [
+      "Combien de trains ont été ajoutés le matin ?",
+      "Qu’est-ce que les voyageurs remarquent ?",
+      "Que fera l’entreprise ensuite ?"
+    ],
+    "ans": [
+      "Deux trains.",
+      "Des trajets plus calmes et plus rapides.",
+      "Elle surveillera la fréquentation avant de décider de nouvelles lignes."
+    ]
+  }
+]
