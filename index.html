@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>French Development — B2 Journey</title>
+  <meta name="description" content="Multi-section French learning app with goals, daily & long-term tracking, speaking, listening, comprehension, vocabulary, and daily phrases." />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="app-title">
+        <h1>🇫🇷 French Development — B2 Journey</h1>
+      </div>
+      <div class="row small">
+        <span id="streakBadge" class="badge">🔥 Streak: 0</span>
+        <span id="goalBadge" class="badge">🎯 Objectif: 30 xp/jour</span>
+        <span id="b2Badge" class="badge">🎓 Objectif B2: <span id="daysToB2"></span> jours</span>
+      </div>
+    </header>
+
+    <nav id="tabs"></nav>
+
+    <!-- DASHBOARD -->
+    <section id="view-dashboard" class="view">
+      <div class="grid">
+        <div class="col-6">
+          <div class="card">
+            <div class="section-title"><h2>📈 Progression du jour</h2><span class="chip small">se réinitialise chaque jour</span></div>
+            <div class="row small">
+              <span>Objectif:</span><span id="goalVal" class="k mono">30 xp</span>
+              <button class="btn" id="decGoal">-</button>
+              <button class="btn" id="incGoal">+</button>
+              <span>Gagné:</span><span id="xpVal" class="k mono">0</span>
+            </div>
+            <div class="bar" style="margin-top:8px"><span id="xpBar" style="width:0%"></span></div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn" data-xp="5" data-flag="listening">+5 Écoute</button>
+              <button class="btn" data-xp="5" data-flag="speaking">+5 Parler</button>
+              <button class="btn" data-xp="5" data-flag="reading">+5 Lecture</button>
+              <button class="btn" data-xp="5" data-flag="vocab">+5 Vocabulaire</button>
+              <button class="btn" data-xp="5" data-flag="phrases">+5 Phrases</button>
+              <button class="btn warn" id="resetDay">Réinitialiser</button>
+            </div>
+            <p class="muted small">Conseil : visez 30–45 xp/jour. 5 xp ≈ 5–10 minutes d’effort concentré.</p>
+          </div>
+        </div>
+
+        <div class="col-6">
+          <div class="card">
+            <div class="section-title"><h2>📊 14 derniers jours</h2><span class="chip small">tendance & cumul</span></div>
+            <canvas id="chart14"></canvas>
+            <div class="row small" style="margin-top:8px">
+              <span>Total 14j: <span id="sum14" class="mono">0</span> xp</span>
+              <span>Semaine en cours: <span id="wkXp" class="mono">0</span> xp</span>
+              <span>Streak jours ≥ objectif: <span id="streakDays" class="mono">0</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-4">
+          <div class="card">
+            <div class="section-title"><h2>🎯 Objectifs</h2></div>
+            <div class="row small">
+              <label for="dailyMinutes" class="muted">Minutes/jour:</label>
+              <input id="dailyMinutes" type="number" min="5" step="5" />
+              <button class="btn" id="saveDailyMinutes">Sauver</button>
+            </div>
+            <div class="row small" style="margin-top:6px">
+              <label for="weeklyHours" class="muted">Heures/semaine:</label>
+              <input id="weeklyHours" type="number" min="1" step="1" />
+              <button class="btn" id="saveWeeklyHours">Sauver</button>
+            </div>
+            <hr />
+            <p class="small">Recommandé pour passer A2 → B2 d’ici fin d’année : <strong>7–10 h / semaine</strong> + pratique active quotidienne (parler/écouter).</p>
+            <p class="muted small">Aujourd’hui: <span id="todayPlan"></span></p>
+          </div>
+        </div>
+
+        <div class="col-4">
+          <div class="card">
+            <div class="section-title"><h2>🧱 Plan B2</h2></div>
+            <ul class="list small">
+              <li><strong>Quotidien (30–45 min):</strong> 10 min vocab SRS, 10 min compréhension, 10–15 min parler/écouter.</li>
+              <li><strong>Hebdo (1–2×):</strong> 30–45 min conversation réelle (tuteur ou tandem).</li>
+              <li><strong>Mensuel:</strong> mini test DELF B1/B2 (lecture, écoute, production).</li>
+              <li><strong>Qualité > quantité:</strong> feedback, correction active, révision espacée.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="col-4">
+          <div class="card">
+            <div class="section-title"><h2>🛠️ Données</h2></div>
+            <div class="row">
+              <button class="btn" id="exportData">Exporter</button>
+              <label class="btn">
+                Importer <input id="importData" type="file" accept="application/json" class="hidden" />
+              </label>
+              <button class="btn bad" id="factoryReset">Réinitialisation complète</button>
+            </div>
+            <p class="small muted">Tout est stocké <em>localement</em> (localStorage). L’export crée un fichier .json à conserver.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPREHENSION -->
+    <section id="view-comprehension" class="view hidden">
+      <div class="card">
+        <div class="section-title"><h2>📰 Compréhension (actualités simplifiées)</h2><span class="chip small">FR ⇄ EN + questions</span></div>
+        <div class="row">
+          <button class="btn" id="nextArticle">Nouveau texte</button>
+          <button class="btn" id="toggleArticleLang">Afficher traduction (EN)</button>
+          <button class="btn" id="speakArticle">🔊 Écouter</button>
+          <button class="btn" id="stopSpeakArticle">⏸️ Stop</button>
+          <button class="btn ok" id="markCompXP">+5 xp</button>
+        </div>
+        <textarea id="articleBox"></textarea>
+        <div id="articleQA" class="small" style="margin-top:8px"></div>
+        <p class="muted small">Astuce: écoutez d’abord, puis lisez, puis répondez mentalement aux questions avant de révéler.</p>
+      </div>
+    </section>
+
+    <!-- SPEAKING -->
+    <section id="view-speaking" class="view hidden">
+      <div class="card">
+        <div class="section-title"><h2>🎤 Parler</h2><span class="chip small">Reconnaissance vocale (Chrome) + invites</span></div>
+        <div class="row small">
+          <span id="micState" class="pill">🎙️ Micro: <span class="mono">checking…</span></span>
+          <span id="recState" class="pill">🗣️ État: <span class="mono">inactif</span></span>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="askMic">Autoriser micro</button>
+          <button class="btn" id="startRec">Démarrer</button>
+          <button class="btn bad" id="stopRec" disabled>Arrêter</button>
+          <button class="btn ok" id="markSpeakXP">+5 xp</button>
+        </div>
+        <p class="muted small">Choisissez un sujet et parlez 60–120 s. Visez des phrases complètes, connecteurs (d’abord, ensuite, pourtant…).</p>
+        <div class="row">
+          <select id="promptSelect" class="btn"></select>
+          <button class="btn" id="newPrompt">Nouvelle invite</button>
+          <button class="btn" id="speakPrompt">🔊 Lire l’invite</button>
+        </div>
+        <textarea id="promptBox" class="small" readonly></textarea>
+        <textarea id="speechOut" placeholder="Votre transcription apparaîtra ici…"></textarea>
+      </div>
+    </section>
+
+    <!-- LISTENING -->
+    <section id="view-listening" class="view hidden">
+      <div class="card">
+        <div class="section-title"><h2>👂 Écoute / Dictée</h2><span class="chip small">Taper ce que vous entendez</span></div>
+        <div class="row">
+          <button class="btn" id="playDictation">▶️ Lire</button>
+          <button class="btn" id="replayDictation">↻ Relire</button>
+          <button class="btn ok" id="markListenXP">+5 xp</button>
+        </div>
+        <p id="dictationHint" class="muted small"></p>
+        <textarea id="dictationInput" placeholder="Écrivez ce que vous entendez ici…"></textarea>
+        <div class="row">
+          <button class="btn" id="checkDictation">Vérifier</button>
+          <span id="dictationScore" class="score"></span>
+        </div>
+        <details style="margin-top:8px">
+          <summary>Afficher le texte cible</summary>
+          <p id="dictationTarget" class="small"></p>
+        </details>
+      </div>
+    </section>
+
+    <!-- VOCABULARY (SRS) -->
+    <section id="view-vocab" class="view hidden">
+      <div class="card">
+        <div class="section-title"><h2>📚 Vocabulaire (répétition espacée)</h2><span class="chip small">Due aujourd’hui: <span id="dueCount">0</span></span></div>
+        <div class="grid">
+          <div class="col-6">
+            <h3>Ajouter des mots</h3>
+            <div class="row">
+              <input id="vFr" type="text" placeholder="mot (FR) — ex: envisager" />
+              <input id="vEn" type="text" placeholder="translation (EN) — ex: to consider" />
+            </div>
+            <div class="row" style="margin-top:6px">
+              <button class="btn" id="addWord">Ajouter</button>
+              <button class="btn" id="exportVocab">Exporter</button>
+              <label class="btn">Importer <input id="importVocab" type="file" accept="application/json" class="hidden"/></label>
+              <button class="btn bad" id="clearVocab">Effacer tout</button>
+            </div>
+            <hr/>
+            <table id="vTable">
+              <thead><tr><th>FR</th><th>EN</th><th>Prochain</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="col-6">
+            <h3>Quiz (FR → EN)</h3>
+            <div class="row small">
+              <span class="muted">Cartes dues: <span id="dueNow">0</span></span>
+              <button class="btn" id="startQuiz">Commencer</button>
+              <button class="btn" id="skipCard" disabled>Passer</button>
+            </div>
+            <div class="card" style="margin-top:8px">
+              <div id="quizFront" class="section-title"><h2>—</h2></div>
+              <input id="quizAnswer" type="text" placeholder="Votre traduction…" />
+              <div class="row" style="margin-top:8px">
+                <button class="btn" id="revealA">Révéler</button>
+                <span id="quizBack" class="k"></span>
+              </div>
+              <div class="row" style="margin-top:8px">
+                <button class="btn bad" id="rateAgain" disabled>Encore (0)</button>
+                <button class="btn warn" id="rateHard" disabled>Difficile (2)</button>
+                <button class="btn" id="rateGood" disabled>Bien (3)</button>
+                <button class="btn ok" id="rateEasy" disabled>Facile (4)</button>
+                <button class="btn ok" id="markVocabXP" disabled>+5 xp</button>
+              </div>
+            </div>
+            <p class="muted small">Algorithme SRS simple (type SM-2) : bonnes réponses → intervalle ↑; erreurs → révisions plus fréquentes.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DAILY PHRASES -->
+    <section id="view-phrases" class="view hidden">
+      <div class="card">
+        <div class="section-title"><h2>🗣️ Phrases courantes — entraînement quotidien</h2><span class="chip small">10 par jour</span></div>
+        <div class="row">
+          <button class="btn" id="newPhrases">Nouveau set</button>
+          <button class="btn" id="speakAllPhrases">🔊 Écouter tout</button>
+          <button class="btn ok" id="markPhrasesXP">+5 xp</button>
+        </div>
+        <div id="phraseList" class="small" style="margin-top:8px"></div>
+      </div>
+    </section>
+
+    <p class="small muted footer-note">Conseil: répartissez la pratique (parler/écouter/lire/vocab) chaque jour; gardez la cadence plutôt que des marathons irréguliers.</p>
+  </div>
+
+  <script type="module" src="./script.js"></script>
+</body>
+</html>
