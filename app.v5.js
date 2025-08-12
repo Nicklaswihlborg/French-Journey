@@ -1,24 +1,5 @@
-/* French Journey – diagnostic build (app.v4.js)
-   - no ES modules
-   - verbose logging + global error capture
-   - identical functionality to your app
-*/
 (function(){
-  const log = (...a)=>console.log('[FJ]', ...a);
-  const warn= (...a)=>console.warn('[FJ]', ...a);
-  const err = (...a)=>console.error('[FJ]', ...a);
-
-  // Global error hooks
-  window.addEventListener('error', e=>{
-    err('WindowError:', e.message, '@', e.filename+':'+e.lineno+':'+e.colno);
-  });
-  window.addEventListener('unhandledrejection', e=>{
-    err('UnhandledRejection:', e.reason);
-  });
-
-  log('JS file loaded, boot starting…');
-
-  /* ---------- Helpers & storage ---------- */
+  // ---------- Helpers ----------
   const $  = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
   const todayKey = () => new Date().toISOString().slice(0,10);
@@ -31,13 +12,12 @@
     return Math.ceil(((d - yearStart)/86400000 + 1)/7);
   };
   const escapeHTML = (s) => String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-
   const store = {
     get(k, def){ try{ return JSON.parse(localStorage.getItem(k)) ?? def } catch { return def } },
     set(k, v){ localStorage.setItem(k, JSON.stringify(v)) }
   };
 
-  /* ---------- Keys / defaults ---------- */
+  // ---------- Keys & defaults ----------
   const K = {
     goalDailyXP: 'fd_goal_daily_xp',
     dailyMinutes: 'fd_daily_minutes',
@@ -59,7 +39,7 @@
     {id:3, fr:'piste cyclable', en:'bike lane', ease:2.5, interval:0, reps:0, due:fmt(todayKey())},
   ]);
 
-  /* ---------- Navigation ---------- */
+  // ---------- Tabs ----------
   const VIEWS = [
     {id:'dashboard', label:'🏠 Tableau de bord'},
     {id:'comprehension', label:'📰 Compréhension'},
@@ -69,8 +49,7 @@
     {id:'phrases', label:'🗣️ Phrases'}
   ];
   function initTabs(){
-    const nav = $('#tabs'); if(!nav){ err('#tabs not found'); return; }
-    nav.innerHTML='';
+    const nav = $('#tabs'); nav.innerHTML='';
     VIEWS.forEach((v,i)=>{
       const b = document.createElement('button');
       b.className = 'btn' + (i===0?' active':'');
@@ -80,18 +59,15 @@
       nav.appendChild(b);
     });
     showView('dashboard', nav.querySelector('button'));
-    log('Tabs mounted');
   }
   function showView(id, btn){
     $$('.view').forEach(v => v.classList.add('hidden'));
-    const target = $('#view-'+id);
-    if(!target){ err('Missing view:', id); return; }
-    target.classList.remove('hidden');
+    $('#view-'+id).classList.remove('hidden');
     $$('#tabs button').forEach(b => b.classList.remove('active'));
     btn && btn.classList.add('active');
   }
 
-  /* ---------- XP / progress ---------- */
+  // ---------- XP / progress ----------
   function getXP(d=todayKey()){ const map=store.get(K.xpByDay,{}); return map[d]||0; }
   function setXP(val, d=todayKey()){ const map=store.get(K.xpByDay,{}); map[d]=val; store.set(K.xpByDay,map); }
   function addXP(amount, flag=null){
@@ -102,8 +78,7 @@
       flags[d] = flags[d] || {listening:false,speaking:false,reading:false,vocab:false,phrases:false};
       flags[d][flag] = true; store.set(K.flagsByDay, flags);
     }
-    refreshProgress();
-    draw14DayChart();
+    refreshProgress(); draw14DayChart();
   }
   function dailyFlags(d=todayKey()){
     return store.get(K.flagsByDay,{})[d] || {listening:false,speaking:false,reading:false,vocab:false,phrases:false};
@@ -162,16 +137,19 @@
     const today = new Date();
     const days = [];
     for(let i=13;i>=0;i--){ const d=addDays(today,-i); const k=d.toISOString().slice(0,10); days.push({k, xp: map[k]||0}); }
+
     const rect=c.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     c.width  = Math.floor(rect.width * dpr);
     c.height = Math.floor(150 * dpr);
+
     g.clearRect(0,0,c.width,c.height);
     const W=c.width, H=c.height, pad=24;
     const slot = (W-2*pad)/days.length;
     const bw   = Math.max(6, slot*0.6);
     const max  = Math.max(store.get(K.goalDailyXP,30), ...days.map(d=>d.xp), 30);
     let sum=0;
+    g.fillStyle = '#60a5fa';
     days.forEach((d,i)=>{ sum+=d.xp; const x=pad+i*slot; const h=(H-2*pad)*(d.xp/max); g.fillRect(Math.round(x), Math.round(H-pad-h), Math.round(bw), Math.round(h)); });
     $('#sum14').textContent = sum;
   }
@@ -190,17 +168,14 @@
     $('#daysToB2').textContent = days;
   }
 
-  /* ---------- Data: fetch JSON (with fallbacks) ---------- */
+  // ---------- Data (JSON) ----------
   let ARTICLES=[], PROMPTS={}, DICT=[], PHRASES=[];
   async function loadJSON(path, fallback){
     try{
       const res = await fetch(path, {cache:'no-store'});
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      log('Loaded', path, '(', Array.isArray(json)? json.length+' items' : Object.keys(json).length+' keys', ')');
-      return json;
-    }catch(e){
-      warn(`Failed to load ${path}:`, e.message, '→ using fallback');
+      return await res.json();
+    }catch{
       return fallback;
     }
   }
@@ -224,7 +199,7 @@
     ]);
   }
 
-  /* ---------- Comprehension ---------- */
+  // ---------- Comprehension ----------
   let showEN=false, artIdx=0, ttsUtter=null;
   function renderArticle(){
     if(!ARTICLES.length){ $('#articleBox').value='(Aucun article chargé)'; $('#articleQA').textContent=''; return; }
@@ -247,7 +222,7 @@
   $('#stopSpeakArticle').onclick = ()=> speechSynthesis.cancel();
   $('#markCompXP').onclick = ()=> addXP(5,'reading');
 
-  /* ---------- Speaking ---------- */
+  // ---------- Speaking ----------
   function fillPromptSelect(){
     const sel = $('#promptSelect'); sel.innerHTML='';
     Object.keys(PROMPTS).forEach(cat=>{
@@ -287,17 +262,17 @@
     if(recog) return;
     recog=new SR(); recog.lang='fr-FR'; recog.interimResults=true; recog.continuous=true; out.value='';
     recog.onresult=(e)=>{ let txt=''; for(let i=0;i<e.results.length;i++){ txt += e.results[i][0].transcript + (e.results[i].isFinal?'\n':' '); } out.value=txt.trim(); };
-    recog.onerror=(e)=> warn('SR error:', e.error||e.message||e);
+    recog.onerror=(e)=> console.warn(e);
     recog.onend=()=>{ recState.innerHTML='🗣️ État: <span class="mono">inactif</span>'; $('#stopRec').disabled=true; recog=null; };
     try{ recog.start(); recState.innerHTML='🗣️ État: <span class="mono">écoute…</span>'; $('#stopRec').disabled=false; }
-    catch(e){ alert("Impossible de démarrer. Autorisez le micro, puis réessayez."); warn(e); }
+    catch{ alert("Impossible de démarrer. Autorisez le micro, puis réessayez."); }
   }
   function stopRec(){ if(recog) recog.stop(); }
   $('#startRec').onclick = startRec;
   $('#stopRec').onclick  = stopRec;
   $('#markSpeakXP').onclick = ()=> addXP(5,'speaking');
 
-  /* ---------- Listening ---------- */
+  // ---------- Listening ----------
   let dIdx=0, lastUtter=null;
   function playCurrentDictation(){
     if(!DICT.length){ $('#dictationHint').textContent='(Aucune dictée chargée)'; return; }
@@ -324,12 +299,11 @@
     return wa.length? match/wa.length : 0;
   }
 
-  /* ---------- Vocab (SRS) ---------- */
+  // ---------- Vocab SRS ----------
   let vocab = store.get(K.vocabList,[]);
   let quizQueue = [], currentCard=null;
   function refreshVocabTable(){
-    const tb = $('#vTable tbody'); if(!tb){ err('#vTable tbody missing'); return; }
-    tb.innerHTML='';
+    const tb = $('#vTable tbody'); tb.innerHTML='';
     vocab.forEach((w)=>{
       const tr=document.createElement('tr');
       tr.innerHTML = `<td>${escapeHTML(w.fr)}</td><td>${escapeHTML(w.en)}</td><td class="small">${w.due}</td><td><button class="btn bad small" data-del="${w.id}">Sup.</button></td>`;
@@ -415,7 +389,7 @@
     serveNextCard();
   }
 
-  /* ---------- Phrases ---------- */
+  // ---------- Phrases ----------
   function todaysPhraseIndexes(){
     const seed = parseInt((store.get(K.dueSeed) ?? Date.now()).toString().slice(-6),10);
     const day = parseInt(todayKey().replace(/-/g,''),10);
@@ -447,18 +421,10 @@
   $('#newPhrases').onclick = ()=>{ store.set(K.dueSeed, Date.now()); renderPhrases(); };
   $('#markPhrasesXP').onclick = ()=> addXP(5,'phrases');
 
-  /* ---------- Init ---------- */
-  function setB2Countdown(){
-    const now=new Date(); const end=new Date(now.getFullYear(),11,31);
-    const days=Math.max(0, Math.ceil((end - now)/86400000));
-    $('#daysToB2').textContent = days;
-  }
-
+  // ---------- Init ----------
   async function init(){
-    log('Init start');
     initTabs();
     await loadAllData();
-    log('Data ready');
 
     renderArticle();
     fillPromptSelect();
@@ -473,14 +439,10 @@
     setB2Countdown();
 
     window.addEventListener('resize', draw14DayChart);
-    log('Init complete ✅');
   }
-
-  // Make sure DOM is ready even if script is in <head>
   if (document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
-
 })();
