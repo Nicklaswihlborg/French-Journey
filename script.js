@@ -1,5 +1,5 @@
-/* French Development — multi-file version (no build tools). */
-/* All data persists in localStorage. JSON content is loaded from ./data/*.json. */
+/* French Journey — clean multi-file script (no build tools)
+   Works on GitHub Pages. All data persists in localStorage. */
 
 /* ===========================
    Helpers & Storage
@@ -15,12 +15,13 @@ const weekNumber = (date = new Date())=>{
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
   return Math.ceil(((d - yearStart)/86400000 + 1)/7);
 };
+const escapeHTML = (s) => String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
+/* localStorage wrapper */
 const store = {
   get(k, def){ try{ return JSON.parse(localStorage.getItem(k)) ?? def } catch { return def } },
   set(k, v){ localStorage.setItem(k, JSON.stringify(v)) }
 };
-// Small HTML-escape
-const escapeHTML = (s) => String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
 /* ===========================
    Keys / Defaults
@@ -35,7 +36,6 @@ const K = {
   dueSeed: 'fd_due_seed',         // phrase set seed
   dataVersion: 'fd_data_v1'
 };
-// defaults
 if (store.get(K.goalDailyXP)==null) store.set(K.goalDailyXP, 30);
 if (store.get(K.dailyMinutes)==null) store.set(K.dailyMinutes, 40);
 if (store.get(K.weeklyHours)==null) store.set(K.weeklyHours, 8);
@@ -51,12 +51,12 @@ if (store.get(K.vocabList)==null) store.set(K.vocabList, [
    Navigation
    =========================== */
 const VIEWS = [
-  {id:'dashboard', label:'🏠 Tableau de bord'},
+  {id:'dashboard',     label:'🏠 Tableau de bord'},
   {id:'comprehension', label:'📰 Compréhension'},
-  {id:'speaking', label:'🎤 Parler'},
-  {id:'listening', label:'👂 Écoute'},
-  {id:'vocab', label:'📚 Vocabulaire'},
-  {id:'phrases', label:'🗣️ Phrases'}
+  {id:'speaking',      label:'🎤 Parler'},
+  {id:'listening',     label:'👂 Écoute'},
+  {id:'vocab',         label:'📚 Vocabulaire'},
+  {id:'phrases',       label:'🗣️ Phrases'}
 ];
 function initTabs(){
   const nav = $('#tabs'); nav.innerHTML='';
@@ -84,8 +84,7 @@ function getXP(d=todayKey()){ const map=store.get(K.xpByDay,{}); return map[d]||
 function setXP(val, d=todayKey()){ const map=store.get(K.xpByDay,{}); map[d]=val; store.set(K.xpByDay,map); }
 function addXP(amount, flag=null){
   const d = todayKey();
-  const curr = getXP(d) + amount;
-  setXP(curr);
+  setXP(getXP(d) + amount);
   if (flag){
     const flags = store.get(K.flagsByDay,{});
     flags[d] = flags[d] || {listening:false,speaking:false,reading:false,vocab:false,phrases:false};
@@ -95,38 +94,35 @@ function addXP(amount, flag=null){
   draw14DayChart();
 }
 function dailyFlags(d=todayKey()){
-  const f = store.get(K.flagsByDay,{})[d] || {listening:false,speaking:false,reading:false,vocab:false,phrases:false};
-  return f;
+  return store.get(K.flagsByDay,{})[d] || {listening:false,speaking:false,reading:false,vocab:false,phrases:false};
 }
 function refreshProgress(){
   const goal = store.get(K.goalDailyXP,30);
-  $('#goalVal').textContent = goal + ' xp';
+  $('#goalVal').textContent = `${goal} xp`;
   $('#goalBadge').textContent = `🎯 Objectif: ${goal} xp/jour`;
 
   const xp = getXP();
   $('#xpVal').textContent = xp;
   $('#xpBar').style.width = Math.min(100, Math.round((xp/goal)*100)) + '%';
 
-  // disable buttons already flagged today
+  // disable daily +xp buttons if already used for that skill today
   const f = dailyFlags();
   document.querySelectorAll('[data-flag]').forEach(btn=>{
     const flag = btn.getAttribute('data-flag');
     btn.disabled = !!f[flag];
     if (!btn._wired){
-      btn.onclick = ()=>{ addXP(parseInt(btn.dataset.xp,10), flag); };
+      btn.onclick = ()=> addXP(parseInt(btn.dataset.xp,10), flag);
       btn._wired = true;
     }
   });
 
-  // Streak
+  // streak & weekly XP
   const streak = calcStreak(goal);
   $('#streakBadge').textContent = `🔥 Streak: ${streak}`;
   $('#streakDays').textContent = streak;
-
-  // Week XP
   $('#wkXp').textContent = calcThisWeekXP();
 
-  // Today plan
+  // small plan
   $('#dailyMinutes').value = store.get(K.dailyMinutes,40);
   $('#weeklyHours').value = store.get(K.weeklyHours,8);
   $('#todayPlan').textContent = `${store.get(K.dailyMinutes)} min • focus: parler/écouter + vocab (SRS)`;
@@ -134,8 +130,7 @@ function refreshProgress(){
 function calcThisWeekXP(){
   const map = store.get(K.xpByDay,{});
   const d = new Date();
-  const wk = weekNumber(d);
-  let sum = 0;
+  const wk = weekNumber(d); let sum = 0;
   Object.entries(map).forEach(([k,v])=>{
     const dt = new Date(k);
     if (weekNumber(dt)===wk && dt.getFullYear()===d.getFullYear()) sum+=v||0;
@@ -145,43 +140,45 @@ function calcThisWeekXP(){
 function calcStreak(goal){
   const map = store.get(K.xpByDay,{});
   let s=0, day=new Date();
-  while(true){
+  for(;;){
     const key = day.toISOString().slice(0,10);
-    if ((map[key]||0) >= goal){ s++; day = addDays(day,-1); }
-    else break;
+    if ((map[key]||0) >= goal){ s++; day = addDays(day,-1); } else break;
   }
   return s;
 }
 function draw14DayChart(){
-  const c = $('#chart14'); const g = c.getContext('2d');
+  const c = $('#chart14'); if(!c) return;
+  const g = c.getContext('2d');
   const map = store.get(K.xpByDay,{});
   const today = new Date();
   const days = [];
   for(let i=13;i>=0;i--){ const d=addDays(today,-i); const k=d.toISOString().slice(0,10); days.push({k, xp: map[k]||0}); }
-  // device pixel ratio sizing
-  const rect=c.getBoundingClientRect();
-  c.width = Math.floor(rect.width * (window.devicePixelRatio||1));
-  c.height = Math.floor(150 * (window.devicePixelRatio||1));
 
-  // clear & draw
+  // size for devicePixelRatio
+  const rect=c.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  c.width  = Math.floor(rect.width * dpr);
+  c.height = Math.floor(150 * dpr);
+
+  // draw
   g.clearRect(0,0,c.width,c.height);
   const W=c.width, H=c.height, pad=24;
   const slot = (W-2*pad)/days.length;
   const bw   = Math.max(6, slot*0.6);
-  const max = Math.max(store.get(K.goalDailyXP,30), ...days.map(d=>d.xp), 30);
+  const max  = Math.max(store.get(K.goalDailyXP,30), ...days.map(d=>d.xp), 30);
   let sum=0;
   days.forEach((d,i)=>{ sum+=d.xp; const x=pad+i*slot; const h=(H-2*pad)*(d.xp/max); g.fillRect(Math.round(x), Math.round(H-pad-h), Math.round(bw), Math.round(h)); });
   $('#sum14').textContent = sum;
 }
 
-/* Goal controls */
+/* controls */
 $('#incGoal').onclick = ()=>{ store.set(K.goalDailyXP, store.get(K.goalDailyXP,30)+5); refreshProgress(); };
 $('#decGoal').onclick = ()=>{ store.set(K.goalDailyXP, Math.max(10, store.get(K.goalDailyXP,30)-5)); refreshProgress(); };
 $('#resetDay').onclick = ()=>{ setXP(0); const flags=store.get(K.flagsByDay,{}); flags[todayKey()]={listening:false,speaking:false,reading:false,vocab:false,phrases:false}; store.set(K.flagsByDay,flags); refreshProgress(); };
 $('#saveDailyMinutes').onclick = ()=>{ store.set(K.dailyMinutes, Math.max(10, parseInt($('#dailyMinutes').value||40,10))); refreshProgress(); };
 $('#saveWeeklyHours').onclick = ()=>{ store.set(K.weeklyHours, Math.max(1, parseInt($('#weeklyHours').value||8,10))); refreshProgress(); };
 
-/* Countdown to Dec 31 (B2 goal) */
+/* Countdown to Dec 31 (B2 goal) — single definition */
 function setB2Countdown(){
   const now=new Date(); const end=new Date(now.getFullYear(),11,31);
   const days=Math.max(0, Math.ceil((end - now)/86400000));
@@ -196,7 +193,7 @@ $('#exportData').onclick = ()=>{
   Object.values(K).forEach(key=> data[key]=store.get(key));
   const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='french_dev_backup.json'; a.click();
+  const a=document.createElement('a'); a.href=url; a.download='french_journey_backup.json'; a.click();
   URL.revokeObjectURL(url);
 };
 $('#importData').onchange = (e)=>{
@@ -220,17 +217,33 @@ $('#factoryReset').onclick = ()=>{
    Load external data (JSON)
    =========================== */
 let ARTICLES=[], PROMPTS={}, DICT=[], PHRASES=[];
-async function loadJSON(path){
-  const res = await fetch(path, {cache:'no-store'});
-  if(!res.ok) throw new Error(`Failed to load ${path}`);
-  return res.json();
+async function loadJSON(path, fallback){
+  try{
+    const res = await fetch(path, {cache:'no-store'});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  }catch{
+    console.warn(`Failed to load ${path}; using fallback.`);
+    return fallback;
+  }
 }
 async function loadAllData(){
+  const fallbackArticles=[{
+    title:'Le vélo en ville',
+    fr:"Aujourd’hui, la mairie a ouvert une nouvelle piste cyclable au centre-ville pour réduire la circulation et la pollution.",
+    en:"Today, the city hall opened a new bike lane downtown to reduce traffic and pollution.",
+    qs:["Pourquoi la mairie a-t-elle ouvert la piste ?"],
+    ans:["Pour réduire la circulation et la pollution."]
+  }];
+  const fallbackPrompts={ daily:["Décris ta routine du matin."] };
+  const fallbackDict=[{text:"Pouvez-vous répéter plus lentement, s'il vous plaît ?", hint:"Demande polie"}];
+  const fallbackPhrases=["Bonjour, comment ça va ?","Merci beaucoup !"];
+
   [ARTICLES, PROMPTS, DICT, PHRASES] = await Promise.all([
-    loadJSON('./data/news.json'),
-    loadJSON('./data/prompts.json'),
-    loadJSON('./data/dictation.json'),
-    loadJSON('./data/phrases.json'),
+    loadJSON('./data/news.json',     fallbackArticles),
+    loadJSON('./data/prompts.json',  fallbackPrompts),
+    loadJSON('./data/dictation.json',fallbackDict),
+    loadJSON('./data/phrases.json',  fallbackPhrases),
   ]);
 }
 
@@ -244,7 +257,7 @@ function renderArticle(){
   $('#articleBox').value = showEN? a.en : a.fr;
   $('#articleQA').innerHTML = `
     <div class="row small"><span class="pill">Texte: ${escapeHTML(a.title)}</span></div>
-    <ol class="small">${a.qs.map((q,i)=>`<li>${escapeHTML(q)} <details class="muted"><summary>Réponse suggérée</summary>${escapeHTML(a.ans[i])}</details></li>`).join('')}</ol>
+    <ol class="small">${(a.qs||[]).map((q,i)=>`<li>${escapeHTML(q)} <details class="muted"><summary>Réponse suggérée</summary>${escapeHTML((a.ans||[])[i]||'')}</details></li>`).join('')}</ol>
   `;
 }
 $('#nextArticle').onclick = ()=>{ artIdx++; renderArticle(); };
@@ -308,7 +321,7 @@ function startRec(){
 }
 function stopRec(){ if(recog) recog.stop(); }
 $('#startRec').onclick = startRec;
-$('#stopRec').onclick = stopRec;
+$('#stopRec').onclick  = stopRec;
 $('#markSpeakXP').onclick = ()=> addXP(5,'speaking');
 
 /* ===========================
@@ -324,15 +337,14 @@ function playCurrentDictation(){
   speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(d.text); u.lang='fr-FR'; u.rate=0.95; lastUtter=u; speechSynthesis.speak(u);
 }
-$('#playDictation').onclick = ()=>{ playCurrentDictation(); };
+$('#playDictation').onclick   = ()=>{ playCurrentDictation(); };
 $('#replayDictation').onclick = ()=>{ if(lastUtter) speechSynthesis.speak(lastUtter); else playCurrentDictation(); };
-$('#checkDictation').onclick = ()=>{
+$('#checkDictation').onclick  = ()=>{
   const target = $('#dictationTarget').textContent.trim().toLowerCase();
-  const guess = $('#dictationInput').value.trim().toLowerCase();
-  const score = similarityWords(target, guess);
-  $('#dictationScore').textContent = `Score: ${Math.round(score*100)}%`;
+  const guess  = $('#dictationInput').value.trim().toLowerCase();
+  $('#dictationScore').textContent = `Score: ${Math.round(similarityWords(target, guess)*100)}%`;
 };
-$('#markListenXP').onclick = ()=> addXP(5,'listening');
+$('#markListenXP').onclick    = ()=> addXP(5,'listening');
 function similarityWords(a,b){
   const wa=a.replace(/[^\p{L}\p{N}\s']/gu,'').split(/\s+/);
   const wb=b.replace(/[^\p{L}\p{N}\s']/gu,'').split(/\s+/);
@@ -358,7 +370,7 @@ function updateDueCount(){
   const today=fmt(todayKey());
   const due=vocab.filter(v=> v.due<=today).length;
   $('#dueCount').textContent = due;
-  $('#dueNow').textContent = due;
+  $('#dueNow').textContent   = due;
 }
 function addVocab(fr,en){
   const id = Date.now()+Math.random();
@@ -379,11 +391,13 @@ $('#exportVocab').onclick = ()=>{
 };
 $('#importVocab').onchange = (e)=>{
   const f=e.target.files[0]; if(!f) return;
-  const r=new FileReader(); r.onload=()=>{ try{ const arr=JSON.parse(r.result); if(Array.isArray(arr)){ vocab=arr; store.set(K.vocabList,vocab); refreshVocabTable(); updateDueCount(); } }catch{ alert('Fichier invalide'); } }; r.readAsText(f);
+  const r=new FileReader();
+  r.onload=()=>{ try{ const arr=JSON.parse(r.result); if(Array.isArray(arr)){ vocab=arr; store.set(K.vocabList,vocab); refreshVocabTable(); updateDueCount(); } }catch{ alert('Fichier invalide'); } };
+  r.readAsText(f);
 };
 $('#clearVocab').onclick = ()=>{ if(confirm('Effacer tout le vocabulaire ?')){ vocab=[]; store.set(K.vocabList,vocab); refreshVocabTable(); updateDueCount(); } };
 
-// Quiz
+// Quiz (SM-2 lite)
 $('#startQuiz').onclick = ()=>{
   const today=fmt(todayKey());
   quizQueue = vocab.filter(v=> v.due<=today);
@@ -393,7 +407,10 @@ $('#startQuiz').onclick = ()=>{
 $('#skipCard').onclick = ()=> serveNextCard();
 function serveNextCard(){
   currentCard = quizQueue.shift();
-  if(!currentCard){ $('#quizFront h2').textContent='Terminé 👏'; disableRate(true); $('#markVocabXP').disabled=false; return; }
+  if(!currentCard){
+    $('#quizFront h2').textContent='Terminé 👏';
+    disableRate(true); $('#markVocabXP').disabled=false; return;
+  }
   $('#quizFront h2').textContent=currentCard.fr;
   $('#quizAnswer').value = ''; $('#quizBack').textContent = '';
   disableRate(true); $('#revealA').disabled=false; $('#skipCard').disabled=false;
@@ -413,7 +430,6 @@ $('#rateEasy').onclick   = ()=> rateCard(4);
 $('#markVocabXP').onclick = ()=>{ addXP(5,'vocab'); $('#markVocabXP').disabled=true; };
 
 function rateCard(grade){
-  // Minimal SM-2 style
   const c=currentCard;
   if(grade<3){
     c.reps=0; c.interval=1; c.ease=Math.max(1.3, c.ease-0.2);
@@ -426,7 +442,6 @@ function rateCard(grade){
   }
   const next = addDays(new Date(), c.interval);
   c.due = fmt(next);
-  // save
   const idx = vocab.findIndex(v=>v.id===c.id);
   if(idx>-1) vocab[idx]=c; store.set(K.vocabList,vocab);
   refreshVocabTable(); updateDueCount();
@@ -437,7 +452,6 @@ function rateCard(grade){
    Daily Phrases
    =========================== */
 function todaysPhraseIndexes(){
-  // deterministic 10 phrases/day based on date
   const seed = parseInt((store.get(K.dueSeed) ?? Date.now()).toString().slice(-6),10);
   const day = parseInt(todayKey().replace(/-/g,''),10);
   const rand = (n)=> (Math.abs(Math.sin(seed+day+n))*10000)%PHRASES.length|0;
@@ -474,17 +488,22 @@ $('#markPhrasesXP').onclick = ()=> addXP(5,'phrases');
 async function init(){
   initTabs();
   await loadAllData();
-  // Fill comprehension & speaking
-  renderArticle();
-  fillPromptSelect(); setPrompt(Object.keys(PROMPTS)[0]||'');
-  // Vocab
-  refreshVocabTable(); updateDueCount();
-  // Phrases
-  renderPhrases();
-  // Progress & chart
-  refreshProgress(); draw14DayChart(); setB2Countdown();
 
-  // Wire dashboard quick +xp buttons (already wired in refreshProgress for flags)
+  // Comprehension + Speaking
+  renderArticle();
+  fillPromptSelect();
+  setPrompt(Object.keys(PROMPTS)[0]||'');
+
+  // Vocab + Phrases
+  refreshVocabTable();
+  updateDueCount();
+  renderPhrases();
+
+  // Progress + chart + B2 countdown
+  refreshProgress();
+  draw14DayChart();
+  setB2Countdown();
+
   window.addEventListener('resize', draw14DayChart);
 }
 init();
